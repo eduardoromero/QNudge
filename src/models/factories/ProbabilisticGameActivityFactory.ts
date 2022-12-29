@@ -2,6 +2,8 @@ import { GameActivity } from '../GameModel';
 import { GamesConfigMap } from '../GamesConfig';
 import { GameActivityFactory } from './GameActivityFactory';
 
+const id = require('@cuvva/ksuid');
+
 export class ProbabilisticGameActivityFactory extends GameActivityFactory {
     private static readonly weights: { [key: string]: number } = {
         'World of Warcraft': 1,
@@ -27,6 +29,7 @@ export class ProbabilisticGameActivityFactory extends GameActivityFactory {
         }
 
         return {
+            id: id.generate('activity').toString(),
             game: randomTitle,
             finished: undefined,
             started: undefined,

@@ -1,165 +1,106 @@
 import { hrtime } from 'node:process';
-import { GameActivity, GameRunner } from './models/GameModel';
-import { duration, logger } from './utils';
-import { GameActivityStore, SimpleNudgingStore, SimpleStore } from './Store';
-import { ProbabilisticGameActivityFactory } from './models/factories/ProbabilisticGameActivityFactory';
-import * as fs from 'fs';
+import { GameRunner } from './models/GameModel';
+import { getRunResults, printGameDistribution, printResults } from './shared/results';
+import { SimpleGameActivityEmitter } from './shared/SimpleGameActivityEmitter';
+import { GameActivityStore, SimpleNudgingStore, SimpleStore } from './shared/Store';
+import { duration, logger } from './shared/utils';
 
-type RunValue = {
-  type: 'average' | 'best' | 'worst';
-  value: number;
-  instance?: GameActivity;
-};
-type RunResults = {
-  average: RunValue;
-  best: RunValue;
-  worst: RunValue;
-};
+async function run(store: GameActivityStore, label: string = '') {
+    logger.info(`Running ${store.length()} games on ${store.name} (${label}).`);
+    let activity = store.getActivity();
 
-function* getGameRunner(activities: GameActivity[]): Generator<GameRunner> {
-  for (let i = 0; i < activities.length; i++) {
-    const activity = activities[i];
-    logger.info(`Getting game #${i + 1} - ${activity.game.title}`);
-    activity.runner = new GameRunner(activity, `${i + 1}`);
-    activity.runner.wait = false;
+    while (activity) {
+        // run the game and wait to fetch and run the next
+        const runner = new GameRunner(activity, activity.id);
+        // this blocks while consuming this activity
+        runner.wait = true;
+        activity.runner = runner;
 
-    yield activity.runner;
-  }
+        logger.info(`(${store.name} - ${activity.id}) Got game runner for ${runner.game.title}, running it.`);
+        await runner.run();
+        logger.info(`(${store.name} - ${activity.id}) done ${label}).`);
+
+        // fetch next
+        activity = store.getActivity();
+    }
 }
 
-function getRunResults(activities: GameActivity[]): RunResults {
-  let best: RunValue = { type: 'best', value: Number.MAX_VALUE },
-    worst: RunValue = { type: 'worst', value: 0 };
+function summary(store: GameActivityStore) {
+    const results = getRunResults(store.getActivitiesResult());
 
-  const total = activities.reduce((acc, activity) => {
-    if (activity.time < best.value) {
-      best.value = activity.time;
-      best.instance = activity;
+    if (store.getNudges()) {
+        logger.info(`Nudged: ${store.getNudges()}`);
     }
 
-    if (activity.time > worst.value) {
-      worst.value = activity.time;
-      worst.instance = activity;
-    }
-
-    return acc + activity.time;
-  }, 0);
-
-  return {
-    average: { value: total / activities.length, type: 'average' },
-    best,
-    worst
-  };
-}
-
-type GenerateOptions = {
-  fifo?: GameActivityStore;
-  nudge?: GameActivityStore;
-};
-
-function generateActivities(total: number, opts: GenerateOptions = {}) {
-  const { fifo = [], nudge = [] } = opts;
-
-  logger.info(`Generating ${total} games...`);
-
-  for (let g = 0; g < total; g++) {
-    const activity = ProbabilisticGameActivityFactory.generate();
-    logger.info(`Generated game ${g + 1}: ${activity.game.title}.`);
-
-    fifo.push({ ...activity });
-    nudge.push({ ...activity });
-  }
-}
-
-async function run(store: GameActivityStore) {
-  logger.info(`Running ${store.length()} games.`);
-
-  for await (const runner of getGameRunner(store.getActivities())) {
-    // run the game and wait to fetch and run the next
-
-    logger.info(`Got game runner for ${runner.game.title}, running it.`);
-    await runner.run();
-  }
-
-  return getRunResults(store.getActivities());
-}
-
-function printResults(results: RunResults) {
-  const { average, best, worst } = results;
-
-  logger.info(`Average time in queue: ${duration(average.value)}`);
-
-  logger.info(
-    `Best time ${duration(best.value)} for ${best.instance.game.title} (${best.instance.runner.id}) size: ${
-      best.instance.game.config.size
-    }GB -> download: ${duration(best.instance.time_download)} -> install: ${duration(best.instance.time_install)}`
-  );
-
-  logger.info(
-    `Worst time: ${duration(worst.value)} for ${worst.instance.game.title} (${worst.instance.runner.id}) size: ${
-      worst.instance.game.config.size
-    }GB -> download: ${duration(worst.instance.time_download)} -> install: ${duration(worst.instance.time_install)}`
-  );
-}
-
-function printGameDistribution(nudge: SimpleNudgingStore) {
-  const activities = nudge.getActivities()
-  const result = {};
-
-  activities.forEach(a => {
-    const title = a.game.title;
-    if (result[title] === undefined) {
-      result[title] = 0;
-    }
-
-    result[title] = result[title] + 1;
-  });
-
-  logger.info({ games: result }, `Games ->`);
+    printResults(results);
 }
 
 async function main() {
-  const total_games = 25;
+    const total_games = 2000;
+    let counter = 0;
 
-  const nudge = new SimpleNudgingStore();
-  const fifo = new SimpleStore();
-  const start = hrtime.bigint();
-  generateActivities(total_games, { fifo, nudge });
+    const nudge = new SimpleNudgingStore();
+    const fifo = new SimpleStore();
 
-  let end = hrtime.bigint();
-  logger.info(`Generation in ${duration(end - start)}.`);
+    const generator = new SimpleGameActivityEmitter({
+        interval: 100, // every 100ms generate one entry
+        total: total_games
+    });
 
-  const fifo_results = run(fifo);
-  const nudge_results = run(nudge);
+    generator.on(SimpleGameActivityEmitter.NEW_EVENT_NAME, (data) => {
+        const { activity } = data;
+        if (activity) {
+            counter++;
+            // so that's easier to follow how far in the generation process we are
+            activity.id = counter;
 
-  const [r1, r2] = await Promise.all([fifo_results, nudge_results]);
+            nudge.push({ ...activity });
+            fifo.push({ ...activity });
+        }
+    });
 
-  // remove cyclic ref to activity from within runner
-  fs.writeFileSync('fifo_resutls.json', JSON.stringify(fifo.getActivities().map(a => {
-    const {runner, ...rest} = a;
+    const start = hrtime.bigint();
+    // start data
+    generator.start();
 
-    return rest;
-  })));
-  fs.writeFileSync('nudge_resutls.json', JSON.stringify(nudge.getActivities().map(a => {
-    const {runner, ...rest} = a;
+    // loop
+    let processors_in_flight = 0;
+    const interval = 633;
+    const consumer_loop = setInterval(async () => {
+        processors_in_flight++;
+        const n = run(nudge, 'clock');
+        const f = run(fifo, 'clock');
 
-    return rest;
-  })));
+        // wait for everyone to finish on this tick
+        await Promise.all([f, n]);
 
-  logger.info(`FIFO:`);
-  printResults(r1);
+        processors_in_flight--;
+        generator.emit(SimpleGameActivityEmitter.DONE_PROCESSING);
+    }, interval);
 
-  logger.info(`NUDGE:`);
-  if (nudge.getNudges()) {
-    logger.info(`>> Total nudges: ${nudge.getNudges()}`);
-  }
+    generator.on(SimpleGameActivityEmitter.DONE_EVENT_NAME, async () => {
+        clearInterval(consumer_loop);
+    });
 
-  printResults(r2);
+    generator.on(SimpleGameActivityEmitter.DONE_PROCESSING, async () => {
+        if (generator.isDone() && processors_in_flight === 0) {
+            // extract last items, if any
+            const n = run(nudge, 'last');
+            const f = run(fifo, 'last');
 
-  printGameDistribution(nudge);
+            // wait for all results to be consumed.
+            await Promise.all([n, f]);
 
-  end = hrtime.bigint();
-  logger.info(`Done in ${duration(end - start)}!`);
+            summary(fifo);
+            summary(nudge);
+
+            // generated game distribution
+            printGameDistribution(nudge);
+
+            const end = hrtime.bigint();
+            logger.info(`Done in ${duration(end - start)}!`);
+        }
+    });
 }
 
 main();

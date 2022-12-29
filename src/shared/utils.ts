@@ -6,7 +6,7 @@ export type VerboseLogger = Logger & {
 };
 
 const base_logger = Pino({
-    level: process.env.LOG_LEVEL || 'debug',
+    level: process.env.LOG_LEVEL || 'info',
     name: 'Queue Nudging',
     // removing pid and hostname from default logger object;
     base: undefined,
@@ -19,7 +19,14 @@ export const logger = base_logger as VerboseLogger;
 
 export async function wait(ms) {
     return new Promise((resolve) => {
-        setTimeout(resolve, ms);
+        setTimeout(
+            (resolve) => {
+                logger.trace(`Done waiting.`);
+                resolve(undefined);
+            },
+            ms,
+            resolve
+        );
     });
 }
 

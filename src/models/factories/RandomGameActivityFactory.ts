@@ -2,6 +2,8 @@ import { GameActivity } from '../GameModel';
 import { GamesList } from '../GamesConfig';
 import { GameActivityFactory } from './GameActivityFactory';
 
+const id = require('@cuvva/ksuid');
+
 export class RandomGameActivityFactory implements GameActivityFactory {
     private static readonly games = GamesList;
 
@@ -10,6 +12,7 @@ export class RandomGameActivityFactory implements GameActivityFactory {
         const randomTitle = this.games[index];
 
         return {
+            id: id.generate('activity').toString(),
             game: randomTitle,
             finished: undefined,
             started: undefined,

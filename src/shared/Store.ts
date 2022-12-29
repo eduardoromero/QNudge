@@ -5,7 +5,7 @@ export interface GameActivityStore {
     readonly name: string;
     length(): number;
     push(activity: GameActivity);
-    getActivities(): GameActivity[];
+    getActivitiesResult(): GameActivity[];
     getActivity(): GameActivity;
     getNudges(): number | undefined;
 }
@@ -13,6 +13,7 @@ export interface GameActivityStore {
 export class SimpleNudgingStore implements GameActivityStore {
     public readonly name = 'SimpleNudgingStore';
     private activities: GameActivity[] = [];
+    private result: GameActivity[] = [];
     private nudges = 0;
 
     public push(activity: GameActivity) {
@@ -37,8 +38,8 @@ export class SimpleNudgingStore implements GameActivityStore {
         return this.activities.length;
     }
 
-    public getActivities(): GameActivity[] {
-        return this.activities;
+    public getActivitiesResult(): GameActivity[] {
+        return this.result;
     }
 
     getNudges(): number {
@@ -46,13 +47,20 @@ export class SimpleNudgingStore implements GameActivityStore {
     }
 
     getActivity(): GameActivity {
-        return this.activities.shift();
+        const activity = this.activities.shift();
+        // push a reference to the results
+        if (activity) {
+            this.result.push(activity);
+        }
+
+        return activity;
     }
 }
 
 export class SimpleStore implements GameActivityStore {
     public readonly name = 'SimpleFIFOStore';
     private activities: GameActivity[] = [];
+    private result: GameActivity[] = [];
 
     public push(activity: GameActivity) {
         this.activities.push(activity);
@@ -62,12 +70,18 @@ export class SimpleStore implements GameActivityStore {
         return this.activities.length;
     }
 
-    getActivities(): GameActivity[] {
-        return this.activities;
+    getActivitiesResult(): GameActivity[] {
+        return this.result;
     }
 
     getActivity(): GameActivity {
-        return this.activities.shift();
+        const activity = this.activities.shift();
+        // push a reference to the results
+        if (activity) {
+            this.result.push(activity);
+        }
+
+        return activity;
     }
 
     getNudges() {
