@@ -1,127 +1,127 @@
-import { getWaitTime, logger, VerboseLogger, wait } from '../utils';
+import { getWaitTime, logger, VerboseLogger, wait } from '../shared/utils';
 
 const id = require('@cuvva/ksuid');
 const JITTER_FACTOR_SMALL = 500;
 const JITTER_FACTOR_BIG = 1500;
 
 export type GameActivity = {
-  game: GameInstance;
-  runner: GameRunner;
-  time: undefined | number;
-  time_download: number;
-  time_install: number;
-  created: number;
-  started: number;
-  finished: number;
-  nudged: boolean;
+    game: GameInstance;
+    runner: GameRunner;
+    time: undefined | number;
+    time_download: number;
+    time_install: number;
+    created: number;
+    started: number;
+    finished: number;
+    nudged: boolean;
 };
 
 export enum GameSize {
-  SMALL = 2,
-  MEDIUM = 10,
-  BIG = 50
+    SMALL = 2,
+    MEDIUM = 10,
+    BIG = 50
 }
 
 export type GameConfig = {
-  size: GameSize;
-  launchTime: number;
+    size: GameSize;
+    launchTime: number;
 };
 
 export class GameInstance {
-  readonly config: GameConfig;
-  readonly title: string;
+    readonly config: GameConfig;
+    readonly title: string;
 
-  constructor(title: string, config: GameConfig) {
-    this.title = title;
-    this.config = config;
-  }
+    constructor(title: string, config: GameConfig) {
+        this.title = title;
+        this.config = config;
+    }
 }
 
 export class GameRunner {
-  readonly activity: GameActivity;
-  readonly game: GameInstance;
-  readonly id: string;
-  readonly logger: VerboseLogger;
-  private ran = false;
-  public nudged = false;
-  public wait = false;
+    readonly activity: GameActivity;
+    readonly game: GameInstance;
+    readonly id: string;
+    readonly logger: VerboseLogger;
+    private ran = false;
+    public nudged = false;
+    public wait = false;
 
-  constructor(activity: GameActivity, i: string = undefined) {
-    this.id = i || id.generate('runner').toString();
-    this.activity = activity;
-    this.game = activity.game;
-    this.logger = logger.child({ game: this.game.title, runner: this.id }) as VerboseLogger;
-  }
-
-  public async download() {
-    // 10s per GB + 5s, +-1500ms
-    const time = getWaitTime(this.game.config.size * 10000 + 5, JITTER_FACTOR_SMALL);
-
-    if (!this.wait) {
-      this.activity.time_download = time;
-
-      return;
+    constructor(activity: GameActivity, i: string = undefined) {
+        this.id = i || id.generate('runner').toString();
+        this.activity = activity;
+        this.game = activity.game;
+        this.logger = logger.child({ game: this.game.title, runner: this.id }) as VerboseLogger;
     }
 
-    const download_start = new Date().getTime();
-    this.logger.verbose({ event: 'downloading' }, `Downloading ${this.game.title}.`);
+    public async download() {
+        // 10s per GB + 5s, +-1500ms
+        const time = getWaitTime(this.game.config.size * 10000 + 5, JITTER_FACTOR_SMALL);
 
-    return wait(time).finally(() => {
-      this.logger.trace({ event: 'downloading_finished' }, `Done downloading.`);
-      this.activity.time_download = new Date().getTime() - download_start;
-    });
-  }
+        if (!this.wait) {
+            this.activity.time_download = time;
 
-  public async install() {
-    // 5s per GB + 5s, +-500ms
-    const time = getWaitTime(this.game.config.size * 5000 + 5000, JITTER_FACTOR_BIG);
+            return;
+        }
 
-    if (!this.wait) {
-      this.activity.time_install = time;
+        const download_start = new Date().getTime();
+        this.logger.verbose({ event: 'downloading' }, `Downloading ${this.game.title}.`);
 
-      return;
+        return wait(time).finally(() => {
+            this.logger.trace({ event: 'downloading_finished' }, `Done downloading.`);
+            this.activity.time_download = new Date().getTime() - download_start;
+        });
     }
 
-    const install_start = new Date().getTime();
-    this.logger.verbose({ event: 'installing' }, `Installing ${this.game.title}.`);
+    public async install() {
+        // 5s per GB + 5s, +-500ms
+        const time = getWaitTime(this.game.config.size * 5000 + 5000, JITTER_FACTOR_BIG);
 
-    return wait(time).finally(() => {
-      this.logger.trace({ event: 'installing_finished' }, `Done installing.`);
-      this.activity.time_install = new Date().getTime() - install_start;
-    });
-  }
+        if (!this.wait) {
+            this.activity.time_install = time;
 
-  public async run() {
-    this.activity.started = new Date().getTime();
-    this.ran = true;
+            return;
+        }
 
-    this.logger.verbose(`Running ${this.game.title}.`);
-    const run_download = this.download();
-    const run_install = this.install();
+        const install_start = new Date().getTime();
+        this.logger.verbose({ event: 'installing' }, `Installing ${this.game.title}.`);
 
-    if (!this.wait) {
-      this.activity.finished = this.activity.started + this.activity.time_install + this.activity.time_download;
-      this.activity.time = this.activity.time_install + this.activity.time_download;
-
-      return;
+        return wait(time).finally(() => {
+            this.logger.trace({ event: 'installing_finished' }, `Done installing.`);
+            this.activity.time_install = new Date().getTime() - install_start;
+        });
     }
 
-    await run_download;
-    await run_install;
+    public async run() {
+        this.activity.started = new Date().getTime();
+        this.ran = true;
 
-    this.activity.finished = new Date().getTime();
-    this.activity.time = this.getTime();
+        this.logger.verbose(`Running ${this.game.title}.`);
+        const run_download = this.download();
+        const run_install = this.install();
 
-    this.logger.verbose({ event: 'running' }, `${this.game.title} is running.`);
+        if (!this.wait) {
+            this.activity.finished = this.activity.started + this.activity.time_install + this.activity.time_download;
+            this.activity.time = this.activity.time_install + this.activity.time_download;
 
-    return;
-  }
+            return;
+        }
 
-  public getTime() {
-    if (!this.ran) {
-      return 0;
+        await run_download;
+        await run_install;
+
+        this.activity.finished = new Date().getTime();
+        this.activity.time = this.getTime();
+
+        this.logger.verbose({ event: 'running' }, `${this.game.title} is running.`);
+
+        return;
     }
 
-    return this.activity.finished - this.activity.started;
-  }
+    public getTime() {
+        if (!this.ran) {
+            return 0;
+        }
+
+        return this.activity.finished - this.activity.started;
+    }
 }
