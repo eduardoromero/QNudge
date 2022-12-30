@@ -75,5 +75,5 @@ export function printGameDistribution(store: GameActivityStore) {
         result[title] = result[title] + 1;
     });
 
-    logger.info({ games: result }, `Games ->`);
+    logger.info({ games: result }, `Game Distribution ->`);
 }

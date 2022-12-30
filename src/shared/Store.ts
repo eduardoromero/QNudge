@@ -3,6 +3,7 @@ import { logger } from './utils';
 
 export interface GameActivityStore {
     readonly name: string;
+    readonly short: string;
     length(): number;
     push(activity: GameActivity);
     getActivitiesResult(): GameActivity[];
@@ -12,6 +13,7 @@ export interface GameActivityStore {
 
 export class SimpleNudgingStore implements GameActivityStore {
     public readonly name = 'SimpleNudgingStore';
+    public readonly short = 'nudge';
     private activities: GameActivity[] = [];
     private result: GameActivity[] = [];
     private nudges = 0;
@@ -59,6 +61,7 @@ export class SimpleNudgingStore implements GameActivityStore {
 
 export class SimpleStore implements GameActivityStore {
     public readonly name = 'SimpleFIFOStore';
+    public readonly short = 'fifo';
     private activities: GameActivity[] = [];
     private result: GameActivity[] = [];
 

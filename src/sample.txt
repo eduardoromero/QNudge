@@ -1,0 +1,43 @@
+[12:11:45.499] INFO (Queue Nudging): =========================SimpleFIFOStore==============================
+[12:11:45.499] INFO (Queue Nudging): ======= Tunic (265) =======
+[12:11:45.501] INFO (Queue Nudging): Average time in queue: 1 second, 753 milliseconds
+[12:11:45.501] INFO (Queue Nudging): Best time 1 second, 749 milliseconds for Tunic (483) size: 2GB -> download: 250 milliseconds -> install: 1 second, 499 milliseconds
+[12:11:45.503] INFO (Queue Nudging): Worst time: 1 second, 767 milliseconds for Tunic (288) size: 2GB -> download: 255 milliseconds -> install: 1 second, 512 milliseconds
+[12:11:45.503] INFO (Queue Nudging): ======= Lost Ark (82) =======
+[12:11:45.504] INFO (Queue Nudging): Average time in queue: 6 seconds, 553 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Best time 6 seconds, 550 milliseconds for Lost Ark (93) size: 10GB -> download: 1 second, 50 milliseconds -> install: 5 seconds, 500 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Worst time: 6 seconds, 576 milliseconds for Lost Ark (451) size: 10GB -> download: 1 second, 60 milliseconds -> install: 5 seconds, 516 milliseconds
+[12:11:45.504] INFO (Queue Nudging): ======= Hollow Knight (52) =======
+[12:11:45.504] INFO (Queue Nudging): Average time in queue: 1 second, 752 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Best time 1 second, 749 milliseconds for Hollow Knight (290) size: 2GB -> download: 250 milliseconds -> install: 1 second, 499 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Worst time: 1 second, 761 milliseconds for Hollow Knight (38) size: 2GB -> download: 253 milliseconds -> install: 1 second, 508 milliseconds
+[12:11:45.504] INFO (Queue Nudging): ======= World of Warcraft (101) =======
+[12:11:45.504] INFO (Queue Nudging): Average time in queue: 30 seconds, 552 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Best time 30 seconds, 549 milliseconds for World of Warcraft (374) size: 50GB -> download: 5 seconds, 49 milliseconds -> install: 25 seconds, 500 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Worst time: 30 seconds, 571 milliseconds for World of Warcraft (276) size: 50GB -> download: 5 seconds, 69 milliseconds -> install: 25 seconds, 502 milliseconds
+[12:11:45.504] INFO (Queue Nudging): =========================SimpleNudgingStore==============================
+[12:11:45.504] INFO (Queue Nudging): Nudged: 122
+[12:11:45.504] INFO (Queue Nudging): ======= Tunic (265) =======
+[12:11:45.504] INFO (Queue Nudging): Average time in queue: 1 second, 753 milliseconds
+[12:11:45.504] INFO (Queue Nudging): Best time 1 second, 750 milliseconds for Tunic (57) size: 2GB -> download: 250 milliseconds -> install: 1 second, 500 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Worst time: 1 second, 762 milliseconds for Tunic (123) size: 2GB -> download: 262 milliseconds -> install: 1 second, 500 milliseconds
+[12:11:45.505] INFO (Queue Nudging): ======= Lost Ark (82) =======
+[12:11:45.505] INFO (Queue Nudging): Average time in queue: 6 seconds, 553 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Best time 6 seconds, 549 milliseconds for Lost Ark (202) size: 10GB -> download: 1 second, 50 milliseconds -> install: 5 seconds, 499 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Worst time: 6 seconds, 566 milliseconds for Lost Ark (260) size: 10GB -> download: 1 second, 66 milliseconds -> install: 5 seconds, 500 milliseconds
+[12:11:45.505] INFO (Queue Nudging): ======= Hollow Knight (52) =======
+[12:11:45.505] INFO (Queue Nudging): Average time in queue: 1 second, 752 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Best time 1 second, 750 milliseconds for Hollow Knight (135) size: 2GB -> download: 250 milliseconds -> install: 1 second, 500 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Worst time: 1 second, 758 milliseconds for Hollow Knight (237) size: 2GB -> download: 254 milliseconds -> install: 1 second, 504 milliseconds
+[12:11:45.505] INFO (Queue Nudging): ======= World of Warcraft (101) =======
+[12:11:45.505] INFO (Queue Nudging): Average time in queue: 30 seconds, 552 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Best time 30 seconds, 550 milliseconds for World of Warcraft (71) size: 50GB -> download: 5 seconds, 51 milliseconds -> install: 25 seconds, 499 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Worst time: 30 seconds, 565 milliseconds for World of Warcraft (205) size: 50GB -> download: 5 seconds, 52 milliseconds -> install: 25 seconds, 513 milliseconds
+[12:11:45.505] INFO (Queue Nudging): Game Distribution ->
+    games: {
+      "Tunic": 265,
+      "Lost Ark": 82,
+      "Hollow Knight": 52,
+      "World of Warcraft": 101
+    }
+[12:11:45.520] INFO (Queue Nudging): Done in 1 minute, 37 seconds, 651 milliseconds!

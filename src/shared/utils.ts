@@ -1,5 +1,7 @@
+import * as fs from 'fs';
 import { default as Pino, Logger } from 'pino';
 import { default as humanizeDuration } from 'humanize-duration';
+import { GameActivity } from '../models/GameModel';
 
 export type VerboseLogger = Logger & {
     verbose: Function;
@@ -39,7 +41,7 @@ export function jitter(value: number, jitter: number): number {
 }
 
 export function getWaitTime(waitInMs: number, jitter_factor: number) {
-    const time = waitInMs; //jitter(waitInMs, jitter_factor);
+    const time = jitter(waitInMs * 10, jitter_factor);
 
     logger.trace(`Waiting for (${waitInMs} +/- ${jitter_factor})ms ${time}ms...`);
 
@@ -59,4 +61,18 @@ export function duration(value: bigint | number): string {
         units: ['h', 'm', 's', 'ms'],
         round: true
     });
+}
+
+export function store(name: string, data: GameActivity[]) {
+    fs.writeFileSync(
+        `${name}.json`,
+        JSON.stringify(
+            data.map((activity) => {
+                // removing circular ref between runner <-> activity before storing on disk
+                const { runner, ...GameActivity } = activity;
+
+                return { GameActivity };
+            })
+        )
+    );
 }

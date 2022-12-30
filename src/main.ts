@@ -1,9 +1,9 @@
 import { hrtime } from 'node:process';
-import { GameRunner } from './models/GameModel';
+import { GameActivity, GameRunner } from './models/GameModel';
 import { getRunResults, printGameDistribution, printResults } from './shared/results';
 import { SimpleGameActivityEmitter } from './shared/SimpleGameActivityEmitter';
 import { GameActivityStore, SimpleNudgingStore, SimpleStore } from './shared/Store';
-import { duration, logger } from './shared/utils';
+import { duration, store as save, logger } from './shared/utils';
 
 async function run(store: GameActivityStore, label: string = '') {
     logger.info(`Running ${store.length()} games on ${store.name} (${label}).`);
@@ -18,7 +18,7 @@ async function run(store: GameActivityStore, label: string = '') {
 
         logger.info(`(${store.name} - ${activity.id}) Got game runner for ${runner.game.title}, running it.`);
         await runner.run();
-        logger.info(`(${store.name} - ${activity.id}) done ${label}).`);
+        logger.info(`(${store.name} - ${activity.id}) done (${label}).`);
 
         // fetch next
         activity = store.getActivity();
@@ -26,17 +26,37 @@ async function run(store: GameActivityStore, label: string = '') {
 }
 
 function summary(store: GameActivityStore) {
-    const results = getRunResults(store.getActivitiesResult());
+    logger.info(`=========================${store.name}==============================`);
+    const by_game: { [key: string]: GameActivity[] } = {};
+    // store full run to disk
+    save(`${store.short}_results`, store.getActivitiesResult());
+
+    store.getActivitiesResult().forEach((activity) => {
+        const { title } = activity.game;
+        if (!by_game[title]) {
+            by_game[title] = [];
+        }
+
+        by_game[title].push(activity);
+    });
 
     if (store.getNudges()) {
         logger.info(`Nudged: ${store.getNudges()}`);
     }
 
-    printResults(results);
+    for (const [game, activities] of Object.entries(by_game)) {
+        logger.info(`======= ${game} (${activities.length}) =======`);
+
+        // save per-game run to disk
+        save(`summary_${store.short}_${game.toLowerCase().replaceAll(' ', '_')}`, activities);
+
+        const results = getRunResults(activities);
+        printResults(results);
+    }
 }
 
 async function main() {
-    const total_games = 2000;
+    const total_games = 15000;
     let counter = 0;
 
     const nudge = new SimpleNudgingStore();
@@ -68,8 +88,8 @@ async function main() {
     const interval = 633;
     const consumer_loop = setInterval(async () => {
         processors_in_flight++;
-        const n = run(nudge, 'clock');
-        const f = run(fifo, 'clock');
+        const n = run(nudge, 'tick');
+        const f = run(fifo, 'tick');
 
         // wait for everyone to finish on this tick
         await Promise.all([f, n]);
