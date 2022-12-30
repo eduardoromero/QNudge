@@ -56,7 +56,7 @@ function summary(store: GameActivityStore) {
 }
 
 async function main() {
-    const total_games = 15000;
+    const total_games = parseInt(process.env.TOTAL_RUNS) || 15000;
     let counter = 0;
 
     const nudge = new SimpleNudgingStore();

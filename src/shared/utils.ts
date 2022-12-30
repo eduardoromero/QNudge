@@ -64,6 +64,10 @@ export function duration(value: bigint | number): string {
 }
 
 export function store(name: string, data: GameActivity[]) {
+    if (process.env['DONT_SAVE']) {
+        return;
+    }
+
     fs.writeFileSync(
         `${name}.json`,
         JSON.stringify(
