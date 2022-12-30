@@ -24,6 +24,9 @@ that even with weaker conditions still make it better than FIFO for light-tailed
 
 ## How to Run
 
+Project is a simple simulation on TypeScript of a "scheduler" (see **Store**) that uses a FIFO Queue and 
+another one that has a FIFO Queue that "nudges" when queueing.
+
 1. Install all dependencies
 
 ```shell
@@ -109,7 +112,7 @@ that the tail is "lighter" with nudge, and the time to play it's better for all 
 
 ![Per-game distribution of time to play - Nudge](static/nudge-distribution-time-to-play.png)
 
-Nudge has shorter time to play for all the games, lighter tails, and the frequency of
+Nudge has shorter time to play for all the games, "thinner" long tails, and the frequency of
 longer time to play is less pronounced that first-come first-served while still
 being relatively fair.
 
