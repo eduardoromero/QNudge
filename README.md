@@ -15,7 +15,8 @@ It's also fair. It's one of the most popular algorithms in practice.
 Nudge is a simple optimization on top of FIFO, and it's very intuitive. In a few words, when a small
 job arrives to the queue, the scheduler checks for the job immediately ahead of it. If that job is bigger
 then we swap their position in the queue, and prioritize the smaller job. And there's a limit, a bigger
-job can only be "jumped" once.
+job can only be "jumped" once. [Here](https://eduardoromero.github.io/nudge-react/) is a visualization of the algorithm
+built with react.
 
 Here's a nice [video introduction](https://www.youtube.com/watch?v=G3NWAOlHpoI) and
 here's the [full paper](https://dl.acm.org/doi/abs/10.1145/3410220.3460102),
@@ -24,7 +25,7 @@ that even with weaker conditions still make it better than FIFO for light-tailed
 
 ## How to Run
 
-Project is a simple simulation on TypeScript of a "scheduler" (see **Store**) that uses a FIFO Queue and 
+Project is a simple simulation on TypeScript of a "scheduler" (see **Store**) that uses a FIFO Queue and
 another one that has a FIFO Queue that "nudges" when queueing.
 
 1. Install all dependencies
@@ -40,6 +41,7 @@ $ TOTAL_RUNS=10 DONT_SAVE=true npm run nudge
 ```
 
 #### Summary
+
 There's a summary at the end, it shows the average for FIFO and Nudge, broken down
 per game, with best and worst time and the average time in queue.
 
@@ -106,6 +108,7 @@ Nudge is under FIFO most of the time. If we zoom into the distributions for both
 that the tail is "lighter" with nudge, and the time to play it's better for all games:
 
 #### FIFO
+
 ![Per-game distribution of time to play - FIFO](static/fifo-distribution-time-to-play.png)
 
 #### Nudge
@@ -150,9 +153,9 @@ Game Distribution -> {
 
 We are measuring the hypothetical time it'll take us to get the game running, so we can play.
 
-For the purpose of the simulation I'm keeping it simple, so it's easier to compare FIFO vs Nudge.
+For the purpose of the simulation I'm keeping it simple to compare FIFO vs Nudge.
 
-For now it just means
+For now, "running" just means:
 
 - Downloading the game. It takes 10ms per GB, with jitter and 5ms.
 - Installing the game. It takes 50ms per GB, with jitter and 50ms.
