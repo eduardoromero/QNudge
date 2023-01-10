@@ -5,8 +5,6 @@ import { ProbabilisticGameActivityFactory } from '../models/factories/Probabilis
 import { GameActivity } from '../models/GameModel';
 import { logger } from './utils';
 
-const id = require('@cuvva/ksuid');
-
 export type GameActivityEmitterProps = {
     total: number;
     interval?: number;
@@ -38,7 +36,7 @@ export class SimpleGameActivityEmitter extends EventEmitter {
         this.ticker = setInterval(() => {
             const activity: GameActivity = ProbabilisticGameActivityFactory.generate();
 
-            this.logger.debug({ game: activity.game.title, id: id.generate('activity').toString() }, `Generated new activity`);
+            this.logger.debug({ game: activity.game.title, id: activity.id }, `Generated new activity`);
             this.emit(SimpleGameActivityEmitter.NEW_EVENT_NAME, { activity });
 
             this.counter++;
