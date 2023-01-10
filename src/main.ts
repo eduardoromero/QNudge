@@ -57,7 +57,7 @@ async function run({ store, label, dal }: RunOptions) {
 
         // store if available
         if (dal) {
-            await dal.store(activity);
+            await dal.store(activity, store.name.toUpperCase());
         }
         // fetch next
         activity = store.getActivity();
@@ -148,7 +148,7 @@ async function main() {
     const interval = 633;
     const consumer_loop = setInterval(async () => {
         processors_in_flight++;
-        const n = run({ store: nudge, label: 'tick', dal: GameActivityDDB });
+        const n = run({ store: nudge, label: 'tick' });
         const f = run({ store: fifo, label: 'tick-fifo' });
 
         // wait for everyone to finish on this tick

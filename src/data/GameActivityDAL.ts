@@ -88,9 +88,13 @@ export class GameActivityDAL {
         };
     }
 
-    public async store(activity: GameActivity) {
+    public async store(activity: GameActivity, type: string | undefined) {
         const entry = GameActivityDAL.map(activity);
+
         entry.run_id = this.run_id;
+        if (type) {
+            entry.type = `${entry.type}_${type}`;
+        }
 
         this.logger.debug({ data: marshall(entry) });
 
@@ -104,11 +108,11 @@ export class GameActivityDAL {
         return this.ddb.send(command);
     }
 
-    public async get(key: string): Promise<GameActivity> {
+    public async get(key: string, type: string | undefined): Promise<GameActivity> {
         return this.ddb
             .send(
                 new GetCommand({
-                    Key: { key, type: TYPE },
+                    Key: { key, type: type ? `${TYPE}_${type}` : TYPE },
                     TableName: this.tableName
                 })
             )
