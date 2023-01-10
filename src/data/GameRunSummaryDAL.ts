@@ -1,10 +1,10 @@
 import { ReturnConsumedCapacity } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, GetCommandInput, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, GetCommandInput, PutCommand, QueryCommand, QueryCommandInput } from '@aws-sdk/lib-dynamodb';
 import { Logger } from 'pino';
 import { GameRunSummary, RunResults, SummaryRunType } from '../shared/results';
 import { DataAccessProps, logger } from '../shared/utils';
 
-type GameRunSummaryEntry = {
+export type GameRunSummaryEntry = {
     key: string;
     type: string;
     results: { [key: string]: RunResults };
@@ -12,9 +12,18 @@ type GameRunSummaryEntry = {
     created: string;
 };
 
+export type QueryOptions = {
+    continue?: Record<string, any>;
+};
+export type FetchResponse = {
+    data: GameRunSummary[];
+    continue: Record<string, any>;
+};
+
 export class GameRunSummaryDAL {
     private readonly ddb: DynamoDBDocumentClient;
     private readonly tableName: string = 'game_activities';
+    private readonly fetchIndex: string = 'run_with_entries_index';
     private readonly logger: Logger;
 
     constructor(props: DataAccessProps) {
@@ -72,7 +81,7 @@ export class GameRunSummaryDAL {
         this.logger.debug({ entry });
 
         const command = new PutCommand({
-            Item: entry,
+            Item: { ...entry, run_id: entry.key },
             TableName: this.tableName
         });
 
@@ -99,6 +108,33 @@ export class GameRunSummaryDAL {
 
             const data = Item as GameRunSummaryEntry;
             return GameRunSummaryDAL.remap(data);
+        });
+    }
+
+    public async fetch_run(key: string, options: QueryOptions = {}): Promise<FetchResponse> {
+        const cmd: QueryCommandInput = {
+            TableName: undefined,
+            ScanIndexForward: false,
+            IndexName: this.fetchIndex,
+            ConsistentRead: false,
+            KeyConditionExpression: 'run_id = :key',
+            ExpressionAttributeValues: {
+                ':key': key
+            }
+        };
+
+        if (options.continue) {
+            cmd.ExclusiveStartKey = options.continue;
+        }
+
+        this.logger.debug({ QueryCommand: cmd });
+
+        return this.ddb.send(new QueryCommand(cmd)).then((response) => {
+            const { Items, ConsumedCapacity, LastEvaluatedKey } = response;
+            this.logger.debug({ items: Items, meta: { ConsumedCapacity } });
+
+            const data = Items as GameRunSummaryEntry[];
+            return { data: data.map(GameRunSummaryDAL.remap), continue: LastEvaluatedKey };
         });
     }
 }
