@@ -11,6 +11,19 @@ export type RunResults = {
     average: RunValue;
     best: RunValue;
     worst: RunValue;
+    count: number;
+};
+
+export enum SummaryRunType {
+    NUDGE = 'NUDGE',
+    FIFO = 'FIFO'
+}
+
+export type GameRunSummary = {
+    id: string;
+    type: SummaryRunType;
+    results: { [key: string]: RunResults };
+    distribution?: { [key: string]: number };
 };
 
 export function getRunResults(activities: GameActivity[]): RunResults {
@@ -32,6 +45,7 @@ export function getRunResults(activities: GameActivity[]): RunResults {
     }, 0);
 
     return {
+        count: activities.length,
         average: { value: total / activities.length, type: 'average' },
         best,
         worst

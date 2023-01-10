@@ -1,10 +1,17 @@
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import * as fs from 'fs';
-import { default as Pino, Logger } from 'pino';
 import { default as humanizeDuration } from 'humanize-duration';
+import { default as Pino, Logger } from 'pino';
 import { GameActivity } from '../models/GameModel';
 
 export type VerboseLogger = Logger & {
     verbose: Function;
+};
+
+export type DataAccessProps = {
+    client: DynamoDBClient;
+    run_id?: string;
+    table?: string;
 };
 
 const base_logger = Pino({

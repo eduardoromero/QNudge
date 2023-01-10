@@ -12,6 +12,7 @@ export interface GameActivityStore {
 }
 
 export class SimpleNudgingStore implements GameActivityStore {
+    public static short = 'nudge';
     public readonly name = 'SimpleNudgingStore';
     public readonly short = 'nudge';
     private activities: GameActivity[] = [];

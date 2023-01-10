@@ -1,11 +1,48 @@
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { captureAsyncFunc, Segment } from 'aws-xray-sdk';
+import { captureAWSv3Client, enableManualMode, getNamespace } from 'aws-xray-sdk-core';
 import { hrtime } from 'node:process';
+import { GameActivityDAL } from './data/GameActivityDAL';
+import { GameRunSummaryDAL } from './data/GameRunSummaryDAL';
 import { GameActivity, GameRunner } from './models/GameModel';
-import { getRunResults, printGameDistribution, printResults } from './shared/results';
+import { GameRunSummary, getRunResults, printGameDistribution, printResults, SummaryRunType } from './shared/results';
 import { SimpleGameActivityEmitter } from './shared/SimpleGameActivityEmitter';
 import { GameActivityStore, SimpleNudgingStore, SimpleStore } from './shared/Store';
-import { duration, store as save, logger } from './shared/utils';
+import { duration, logger, store as save } from './shared/utils';
 
-async function run(store: GameActivityStore, label: string = '') {
+// manual mode, no lambda magic ="(
+enableManualMode();
+// TODO: setting level to DEBUG or TRACE makes the tracing loop for some reason 🤷‍
+// disabling for now
+// setXRayLogger(logger);
+
+// creating a context, and what will be the base segment
+const ns = getNamespace();
+const segment = new Segment('NodeJS-QNudge');
+
+const ddb = captureAWSv3Client(
+    new DynamoDBClient({
+        region: process.env.AWS_REGION || 'us-west-2'
+    }),
+    segment
+);
+const id = require('@cuvva/ksuid');
+
+const run_id = id.generate('run').toString();
+const GameActivityDDB = new GameActivityDAL({ client: ddb, run_id });
+const GameRunSummaryDDB = new GameRunSummaryDAL({ client: ddb });
+
+type RunOptions = {
+    store: GameActivityStore;
+    label: string;
+    dal?: GameActivityDAL;
+};
+
+async function run({ store, label, dal }: RunOptions) {
+    const subsegment = segment.addNewSubsegment('ConsumerRun');
+    subsegment.addMetadata('items', store.length());
+    subsegment.addAnnotation('store', store.short);
+
     logger.info(`Running ${store.length()} games on ${store.name} (${label}).`);
     let activity = store.getActivity();
 
@@ -13,19 +50,26 @@ async function run(store: GameActivityStore, label: string = '') {
         // run the game and wait to fetch and run the next
         const runner = new GameRunner(activity, activity.id);
         // this blocks while consuming this activity
-        runner.wait = true;
+        runner.wait = false;
         activity.runner = runner;
 
         logger.info(`(${store.name} - ${activity.id}) Got game runner for ${runner.game.title}, running it.`);
         await runner.run();
         logger.info(`(${store.name} - ${activity.id}) done (${label}).`);
 
+        // store if available
+        if (dal) {
+            await dal.store(activity);
+        }
         // fetch next
         activity = store.getActivity();
     }
+
+    // done!
+    subsegment.close();
 }
 
-function summary(store: GameActivityStore) {
+async function summary(store: GameActivityStore) {
     logger.info(`=========================${store.name}==============================`);
     const by_game: { [key: string]: GameActivity[] } = {};
     // store full run to disk
@@ -44,19 +88,37 @@ function summary(store: GameActivityStore) {
         logger.info(`Nudged: ${store.getNudges()}`);
     }
 
+    const summary: GameRunSummary = {
+        id: run_id,
+        type: store.short === SimpleNudgingStore.short ? SummaryRunType.NUDGE : SummaryRunType.FIFO,
+        results: {},
+        distribution: {}
+    };
+
     for (const [game, activities] of Object.entries(by_game)) {
         logger.info(`======= ${game} (${activities.length}) =======`);
 
         // save per-game run to disk
-        save(`summary_${store.short}_${game.toLowerCase().replaceAll(' ', '_')}`, activities);
+        const title = `${game.toLowerCase().replaceAll(' ', '_')}`;
+        save(`summary_${store.short}_${title}`, activities);
 
         const results = getRunResults(activities);
+        summary.results[title] = results;
+        summary.distribution[title] = results.count;
+
         printResults(results);
+    }
+
+    try {
+        await GameRunSummaryDDB.store(summary);
+        logger.info(`Game Run Summary stored: ${run_id} ${summary.type}.`);
+    } catch (error) {
+        logger.error(error, `There was an error attempting to store the summary on DDB.`);
     }
 }
 
 async function main() {
-    const total_games = parseInt(process.env.TOTAL_RUNS) || 15000;
+    const total_games = parseInt(process.env.TOTAL_RUNS) || 100;
     let counter = 0;
 
     const nudge = new SimpleNudgingStore();
@@ -72,7 +134,7 @@ async function main() {
         if (activity) {
             counter++;
             // so that's easier to follow how far in the generation process we are
-            activity.id = counter;
+            // activity.id = counter;
 
             nudge.push({ ...activity });
             fifo.push({ ...activity });
@@ -88,8 +150,8 @@ async function main() {
     const interval = 633;
     const consumer_loop = setInterval(async () => {
         processors_in_flight++;
-        const n = run(nudge, 'tick');
-        const f = run(fifo, 'tick');
+        const n = run({ store: nudge, label: 'tick', dal: GameActivityDDB });
+        const f = run({ store: fifo, label: 'tick-fifo' });
 
         // wait for everyone to finish on this tick
         await Promise.all([f, n]);
@@ -98,21 +160,31 @@ async function main() {
         generator.emit(SimpleGameActivityEmitter.DONE_PROCESSING);
     }, interval);
 
-    generator.on(SimpleGameActivityEmitter.DONE_EVENT_NAME, async () => {
-        clearInterval(consumer_loop);
+    generator.on(SimpleGameActivityEmitter.DONE_PROCESSING, async () => {
+        if (processors_in_flight === 0) {
+            clearInterval(consumer_loop);
+
+            // trigger that it's done
+            generator.emit(SimpleGameActivityEmitter.DONE_EVENT_NAME);
+        }
     });
 
-    generator.on(SimpleGameActivityEmitter.DONE_PROCESSING, async () => {
+    generator.on(SimpleGameActivityEmitter.DONE_EVENT_NAME, async () => {
         if (generator.isDone() && processors_in_flight === 0) {
+            logger.info(`Done processing.`);
+
             // extract last items, if any
-            const n = run(nudge, 'last');
-            const f = run(fifo, 'last');
+            const n = run({ store: nudge, label: 'last-nudge', dal: GameActivityDDB });
+            const f = run({ store: fifo, label: 'last-fifo', dal: GameActivityDDB });
 
             // wait for all results to be consumed.
             await Promise.all([n, f]);
 
-            summary(fifo);
-            summary(nudge);
+            const fifo_summary = summary(fifo);
+            const nudge_summary = summary(nudge);
+
+            // wait for summaries to finish storing
+            await Promise.allSettled([fifo_summary, nudge_summary]);
 
             // generated game distribution
             printGameDistribution(nudge);
@@ -123,4 +195,19 @@ async function main() {
     });
 }
 
-main();
+ns.run(() => {
+    // adding subsegment with the main trigger
+    captureAsyncFunc(
+        'Generate',
+        (subsegment) => {
+            return main().finally(() => subsegment?.close());
+        },
+        segment
+    );
+});
+
+// capturing when the event loop says bye to close the segment.
+process.on('exit', () => {
+    logger.debug(`Done tracing. Closing base segment.`);
+    segment?.close();
+});
