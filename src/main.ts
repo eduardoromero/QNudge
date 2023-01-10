@@ -48,7 +48,7 @@ async function run({ store, label, dal }: RunOptions) {
         // run the game and wait to fetch and run the next
         const runner = new GameRunner(activity, activity.id);
         // this blocks while consuming this activity
-        runner.wait = false;
+        runner.wait = true;
         activity.runner = runner;
 
         logger.info(`(${store.name} - ${activity.id}) Got game runner for ${runner.game.title}, running it.`);
@@ -57,7 +57,7 @@ async function run({ store, label, dal }: RunOptions) {
 
         // store if available
         if (dal) {
-            await dal.store(activity, store.name.toUpperCase());
+            await dal.store(activity, store.short.toUpperCase());
         }
         // fetch next
         activity = store.getActivity();
@@ -148,8 +148,8 @@ async function main() {
     const interval = 633;
     const consumer_loop = setInterval(async () => {
         processors_in_flight++;
-        const n = run({ store: nudge, label: 'tick' });
-        const f = run({ store: fifo, label: 'tick-fifo' });
+        const n = run({ store: nudge, label: 'tick', dal: GameActivityDDB });
+        const f = run({ store: fifo, label: 'tick-fifo', dal: GameActivityDDB });
 
         // wait for everyone to finish on this tick
         await Promise.all([f, n]);
