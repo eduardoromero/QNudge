@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { captureAsyncFunc, Segment } from 'aws-xray-sdk';
+import { captureAsyncFunc, Segment, setLogger as setXRayLogger } from 'aws-xray-sdk';
 import { captureAWSv3Client, enableManualMode, getNamespace } from 'aws-xray-sdk-core';
 import { hrtime } from 'node:process';
 import { GameActivityDAL } from './data/GameActivityDAL';
@@ -12,9 +12,7 @@ import { duration, logger, store as save } from './shared/utils';
 
 // manual mode, no lambda magic ="(
 enableManualMode();
-// TODO: setting level to DEBUG or TRACE makes the tracing loop for some reason 🤷‍
-// disabling for now
-// setXRayLogger(logger);
+setXRayLogger(logger);
 
 // creating a context, and what will be the base segment
 const ns = getNamespace();
