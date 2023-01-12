@@ -1,8 +1,10 @@
 import { ReturnConsumedCapacity } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, GetCommandInput, PutCommand, QueryCommand, QueryCommandInput } from '@aws-sdk/lib-dynamodb';
 import { Logger } from 'pino';
+import { GameActivity } from '../models/GameModel';
 import { GameRunSummary, RunResults, SummaryRunType } from '../shared/results';
 import { DataAccessProps, logger } from '../shared/utils';
+import { GameActivityDAL } from './GameActivityDAL';
 
 export type GameRunSummaryEntry = {
     key: string;
@@ -13,11 +15,12 @@ export type GameRunSummaryEntry = {
 };
 
 export type QueryOptions = {
-    continue?: Record<string, any>;
+    token?: Record<string, any>;
 };
+export type FetchResponseItem = GameRunSummary | GameActivity;
 export type FetchResponse = {
-    data: GameRunSummary[];
-    continue: Record<string, any>;
+    data: FetchResponseItem[];
+    token: Record<string, any>;
 };
 
 export class GameRunSummaryDAL {
@@ -113,28 +116,36 @@ export class GameRunSummaryDAL {
 
     public async fetch_run(key: string, options: QueryOptions = {}): Promise<FetchResponse> {
         const cmd: QueryCommandInput = {
-            TableName: undefined,
+            TableName: this.tableName,
             ScanIndexForward: false,
             IndexName: this.fetchIndex,
             ConsistentRead: false,
             KeyConditionExpression: 'run_id = :key',
             ExpressionAttributeValues: {
                 ':key': key
-            }
+            },
+            ReturnConsumedCapacity: ReturnConsumedCapacity.INDEXES,
+            Limit: 25
         };
 
-        if (options.continue) {
-            cmd.ExclusiveStartKey = options.continue;
+        if (options.token) {
+            cmd.ExclusiveStartKey = options.token;
         }
 
         this.logger.debug({ QueryCommand: cmd });
 
         return this.ddb.send(new QueryCommand(cmd)).then((response) => {
             const { Items, ConsumedCapacity, LastEvaluatedKey } = response;
-            this.logger.debug({ items: Items, meta: { ConsumedCapacity } });
+            this.logger.debug({ items: Items.length, meta: { ConsumedCapacity, LastEvaluatedKey } });
 
-            const data = Items as GameRunSummaryEntry[];
-            return { data: data.map(GameRunSummaryDAL.remap), continue: LastEvaluatedKey };
+            const entries = Items.map((i: any) => {
+                if (i.type === 'NUDGE' || i.type === 'FIFO') {
+                    return GameRunSummaryDAL.remap(i);
+                } else {
+                    return GameActivityDAL.remap(i);
+                }
+            });
+            return { data: entries, token: LastEvaluatedKey };
         });
     }
 }

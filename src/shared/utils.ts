@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { default as humanizeDuration } from 'humanize-duration';
 import { default as Pino, Logger } from 'pino';
 import { GameActivity } from '../models/GameModel';
+import * as AWSXRay from 'aws-xray-sdk-core';
 
 export type VerboseLogger = Logger & {
     verbose: Function;
@@ -87,3 +88,10 @@ export function store(name: string, data: GameActivity[]) {
         )
     );
 }
+
+// set the default logger
+AWSXRay.setLogger(logger);
+// flush as soon as possible, +50 items cause segments to be too big.
+AWSXRay.setStreamingThreshold(0);
+
+export const XRay = AWSXRay;

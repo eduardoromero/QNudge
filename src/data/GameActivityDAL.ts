@@ -7,7 +7,7 @@ import { DataAccessProps, logger } from '../shared/utils';
 const id = require('@cuvva/ksuid');
 const TYPE = 'ACTIVITY';
 
-type GameActivityEntry = {
+export type GameActivityEntry = {
     key: string;
     title: string;
     size: string;

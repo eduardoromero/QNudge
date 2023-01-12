@@ -1,6 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { captureAsyncFunc, Segment, setLogger as setXRayLogger } from 'aws-xray-sdk';
-import { captureAWSv3Client, enableManualMode, getNamespace } from 'aws-xray-sdk-core';
+import { Segment } from 'aws-xray-sdk';
 import { hrtime } from 'node:process';
 import { GameActivityDAL } from './data/GameActivityDAL';
 import { GameRunSummaryDAL } from './data/GameRunSummaryDAL';
@@ -8,17 +7,12 @@ import { GameActivity, GameRunner } from './models/GameModel';
 import { GameRunSummary, getRunResults, printGameDistribution, printResults, SummaryRunType } from './shared/results';
 import { SimpleGameActivityEmitter } from './shared/SimpleGameActivityEmitter';
 import { GameActivityStore, SimpleNudgingStore, SimpleStore } from './shared/Store';
-import { duration, logger, store as save } from './shared/utils';
+import { duration, logger, store as save, XRay } from './shared/utils';
 
-// manual mode, no lambda magic ="(
-enableManualMode();
-setXRayLogger(logger);
-
-// creating a context, and what will be the base segment
-const ns = getNamespace();
+XRay.enableManualMode();
 const segment = new Segment('NodeJS-QNudge');
 
-const ddb = captureAWSv3Client(
+const ddb = XRay.captureAWSv3Client(
     new DynamoDBClient({
         region: process.env.AWS_REGION || 'us-west-2'
     }),
@@ -37,6 +31,11 @@ type RunOptions = {
 };
 
 async function run({ store, label, dal }: RunOptions) {
+    if (!store.length()) {
+        // skip empty, no-op;
+        return;
+    }
+
     const subsegment = segment.addNewSubsegment('ConsumerRun');
     subsegment.addMetadata('items', store.length());
     subsegment.addAnnotation('store', store.short);
@@ -116,7 +115,7 @@ async function summary(store: GameActivityStore) {
 }
 
 async function main() {
-    const total_games = parseInt(process.env.TOTAL_RUNS) || 100;
+    const total_games = parseInt(process.env.TOTAL_RUNS) || 10;
     let counter = 0;
 
     const nudge = new SimpleNudgingStore();
@@ -189,23 +188,20 @@ async function main() {
 
             const end = hrtime.bigint();
             logger.info(`Done in ${duration(end - start)}!`);
+
+            // signal that we are done, terminate and send the trace.
+            generator.emit(SimpleGameActivityEmitter.TERMINATE);
         }
+    });
+
+    generator.on(SimpleGameActivityEmitter.TERMINATE, () => {
+        logger.debug(`Done tracing. Closing base segment.`);
+        segment.close();
+        segment.flush();
+
+        logger.info(`trace: ${segment.trace_id}`);
     });
 }
 
-ns.run(() => {
-    // adding subsegment with the main trigger
-    captureAsyncFunc(
-        'Generate',
-        (subsegment) => {
-            return main().finally(() => subsegment?.close());
-        },
-        segment
-    );
-});
-
-// capturing when the event loop says bye to close the segment.
-process.on('exit', () => {
-    logger.debug(`Done tracing. Closing base segment.`);
-    segment?.close();
-});
+const subsegment = segment.addNewSubsegment('Generate');
+main().finally(() => subsegment?.close());

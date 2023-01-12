@@ -15,6 +15,7 @@ export class SimpleGameActivityEmitter extends EventEmitter {
     public static readonly NEW_EVENT_NAME = 'new_activity';
     public static readonly DONE_EVENT_NAME = 'done_generating';
     public static readonly DONE_PROCESSING = 'done_processing;';
+    public static readonly TERMINATE = 'terminate';
 
     public readonly total: number;
     public readonly interval: number;
