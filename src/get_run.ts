@@ -1,22 +1,18 @@
 // manual mode, no lambda magic ="(
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { captureAsyncFunc, Segment, setLogger as setXRayLogger } from 'aws-xray-sdk';
-import { captureAWSv3Client, enableManualMode, getNamespace } from 'aws-xray-sdk-core';
+import { Segment } from 'aws-xray-sdk';
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 import { GameRunSummaryDAL } from './data/GameRunSummaryDAL';
 
-import { logger } from './shared/utils';
-
-enableManualMode();
-setXRayLogger(logger);
+import { logger, XRay } from './shared/utils';
 
 // creating a context, and what will be the base segment
-const ns = getNamespace();
+const ns = XRay.getNamespace();
 const segment = new Segment('NodeJS-QNudge');
 segment.addAnnotation('operation', 'get_run');
 
-const ddb = captureAWSv3Client(
+const ddb = XRay.captureAWSv3Client(
     new DynamoDBClient({
         region: process.env.AWS_REGION || 'us-west-2'
     }),
@@ -55,19 +51,18 @@ const args = yargs(hideBin(process.argv))
     .parseSync();
 
 // capturing to get traces and a pretty subsegment with the activity.
-ns.run(() => {
+ns.run(async () => {
+    XRay.setSegment(segment);
+
     const { id, type } = args;
-    captureAsyncFunc(
+    await XRay.captureAsyncFunc(
         'GetRun',
         (subsegment) => {
             return getRun(id, type).finally(() => subsegment?.close());
         },
         segment
     );
-});
 
-// capturing when the event loop says bye to close the segment.
-process.on('exit', () => {
     logger.debug(`Done tracing. Closing base segment.`);
     segment?.close();
 });
