@@ -4,6 +4,7 @@ import { Segment } from 'aws-xray-sdk';
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs/yargs';
 import { GameRunSummaryDAL } from './data/GameRunSummaryDAL';
+import { getResponseMetadata, getRequestMetadata } from './shared/DynamoDBUtils';
 
 import { logger, XRay } from './shared/utils';
 
@@ -18,6 +19,18 @@ const ddb = XRay.captureAWSv3Client(
     }),
     segment
 );
+
+ddb.middlewareStack.add(getRequestMetadata, {
+    step: 'build',
+    name: 'debug-request'
+});
+
+ddb.middlewareStack.addRelativeTo(getResponseMetadata, {
+    name: 'response-size',
+    relation: 'before',
+    toMiddleware: 'XRaySDKInstrumentation'
+});
+
 const GameRunSummaryDDB = new GameRunSummaryDAL({ client: ddb });
 
 async function getRun(id: string, type: string) {

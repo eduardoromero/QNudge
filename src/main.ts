@@ -18,6 +18,7 @@ const ddb = XRay.captureAWSv3Client(
     }),
     segment
 );
+
 const id = require('@cuvva/ksuid');
 
 const run_id = id.generate('run').toString();
